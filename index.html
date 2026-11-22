@@ -69,12 +69,12 @@ $("connect").onclick=()=>{
  const peerId="twinscreen-"+roomId+"-"+role;
  status("接続中…");
  peer=new Peer(peerId,{debug:1});
- peer.on("open",()=>{connected=true;status("接続準備完了。相手の接続を待っています",true);$("share").disabled=false;$("connect").disabled=true;callOther()});
+ peer.on("open",()=>{connected=true;status("接続準備完了。相手の接続を待っています",true);$("share").disabled=false;$("connect").disabled=true});
  peer.on("call",incoming=>{if(call)call.close();call=incoming;call.answer(localStream||undefined);wireCall(call)});
  peer.on("error",e=>{status("接続エラー："+(e.type||e.message));toast("接続できませんでした。コードや通信環境を確認してください");});
  peer.on("disconnected",()=>status("通信サーバーから切断されました"));
 };
-function callOther(){if(!peer||!connected)return;const other="twinscreen-"+roomId+"-"+(role==="a"?"b":"a");try{const c=peer.call(other,localStream||undefined);if(c){call=c;wireCall(c)}}catch(e){console.warn(e)}}
+function callOther(){if(!peer||!connected||!localStream)return;const other="twinscreen-"+roomId+"-"+(role==="a"?"b":"a");try{const c=peer.call(other,localStream||undefined);if(c){call=c;wireCall(c)}}catch(e){console.warn(e)}}
 function wireCall(c){c.on("stream",s=>{remoteStream=s;$("remote").srcObject=s;$("empty").style.display="none";$("full").disabled=false;status("相手の画面を受信中",true)});c.on("close",()=>{remoteStream=null;$("remote").srcObject=null;$("empty").style.display="block";$("full").disabled=true});c.on("error",e=>{console.warn(e);toast("映像接続に失敗しました")})}
 $("share").onclick=async()=>{
  if(!navigator.mediaDevices?.getDisplayMedia){toast("このブラウザは画面共有に対応していません");$("support").textContent="この端末のブラウザでは画面共有機能が利用できません。PC版Chromeまたは対応ブラウザをお試しください。";return}
