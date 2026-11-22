@@ -53,7 +53,8 @@ footer{text-align:center;color:#718096;font-size:12px;padding:12px}
 </section>
 </main>
 <footer>TwinScreen · WebRTC screen sharing</footer><div id="toast"></div>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js">checkShareSupport();
+</script>
 <script>
 const $=id=>document.getElementById(id);
 let peer=null,call=null,localStream=null,remoteStream=null,roomId="",role="",connected=false;
@@ -69,7 +70,7 @@ $("connect").onclick=()=>{
  const peerId="twinscreen-"+roomId+"-"+role;
  status("接続中…");
  peer=new Peer(peerId,{debug:1});
- peer.on("open",()=>{connected=true;status("接続準備完了。相手の接続を待っています",true);$("share").disabled=false;$("connect").disabled=true});
+ peer.on("open",()=>{connected=true;status("接続準備完了。相手の接続を待っています",true);updateShareButton();$("connect").disabled=true});
  peer.on("call",incoming=>{if(call)call.close();call=incoming;call.answer(localStream||undefined);wireCall(call)});
  peer.on("error",e=>{status("接続エラー："+(e.type||e.message));toast("接続できませんでした。コードや通信環境を確認してください");});
  peer.on("disconnected",()=>status("通信サーバーから切断されました"));
@@ -77,7 +78,7 @@ $("connect").onclick=()=>{
 function callOther(){if(!peer||!connected||!localStream)return;const other="twinscreen-"+roomId+"-"+(role==="a"?"b":"a");try{const c=peer.call(other,localStream||undefined);if(c){call=c;wireCall(c)}}catch(e){console.warn(e)}}
 function wireCall(c){c.on("stream",s=>{remoteStream=s;$("remote").srcObject=s;$("empty").style.display="none";$("full").disabled=false;status("相手の画面を受信中",true)});c.on("close",()=>{remoteStream=null;$("remote").srcObject=null;$("empty").style.display="block";$("full").disabled=true});c.on("error",e=>{console.warn(e);toast("映像接続に失敗しました")})}
 $("share").onclick=async()=>{
- if(!navigator.mediaDevices?.getDisplayMedia){toast("このブラウザは画面共有に対応していません");$("support").textContent="この端末のブラウザでは画面共有機能が利用できません。PC版Chromeまたは対応ブラウザをお試しください。";return}
+ if(!window.isSecureContext||!navigator.mediaDevices?.getDisplayMedia){toast("このブラウザでは画面共有を利用できません");checkShareSupport();return}
  try{
   localStream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false});
   localStream.getVideoTracks()[0].addEventListener("ended",stopShare);
@@ -85,10 +86,30 @@ $("share").onclick=async()=>{
   $("share").disabled=true;$("stop").disabled=false;toast("画面共有を開始しました");
  }catch(e){if(e.name!=="NotAllowedError")toast("画面共有を開始できません："+e.message)}
 };
-function stopShare(){if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}if(call){call.close();call=null}if(connected)callOther();$("share").disabled=!connected;$("stop").disabled=true}
+function stopShare(){if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}if(call){call.close();call=null}if(connected)callOther();updateShareButton();$("stop").disabled=true}
 $("stop").onclick=stopShare;
 $("full").onclick=()=>{const v=$("remote");if(v.requestFullscreen)v.requestFullscreen();else if(v.webkitEnterFullscreen)v.webkitEnterFullscreen()};
-$("disconnect").onclick=()=>{stopShare();if(peer){peer.destroy();peer=null}connected=false;$("connect").disabled=false;$("share").disabled=true;$("stop").disabled=true;$("full").disabled=true;$("remote").srcObject=null;$("empty").style.display="block";status("切断しました")};
-if(!navigator.mediaDevices?.getDisplayMedia)$("support").textContent="このブラウザでは画面共有APIが使えない可能性があります。Androidは端末・ブラウザによって非対応の場合があります。";
+$("disconnect").onclick=()=>{stopShare();if(peer){peer.destroy();peer=null}connected=false;$("connect").disabled=false;$("share").disabled=true;$("stop").disabled=true;$("full").disabled=true;$("remote").srcObject=null;$("empty").style.display="block";status("切断しました");updateShareButton()};
+function checkShareSupport(){
+ const secure=window.isSecureContext;
+ const api=!!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia);
+ const android=/Android/i.test(navigator.userAgent);
+ const support=$("support");
+ if(!secure){
+  support.textContent="HTTPSで開く必要があります。GitHub Pagesの https:// からアクセスしてください。";
+ }else if(!api){
+  support.textContent=android
+   ?"このAndroidブラウザは画面全体の共有機能に対応していません。アプリ追加なしではスマホ画面を直接送信できません。相手の画面を受信することはできます。"
+   :"このブラウザでは画面共有APIが利用できません。対応ブラウザで開いてください。";
+ }else{
+  support.textContent=android
+   ?"画面共有APIを検出しました。ただしAndroidでは端末・ブラウザの仕様により、共有を開始できない場合があります。"
+   :"画面共有に対応しています。開始ボタンから共有する画面を選択してください。";
+ }
+ updateShareButton();
+}
+function updateShareButton(){
+ $("share").disabled=!connected||!window.isSecureContext||!navigator.mediaDevices?.getDisplayMedia||!!localStream;
+}
 </script>
 </body></html>
